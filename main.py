@@ -1,18 +1,24 @@
 from dotenv import load_dotenv
 load_dotenv()
-
+from agents.supervisor import supervisor
 from graph.workflow import app
 
 
-# query = "Why i am not able to sign up in system?"4
 query = "Why my order status and my order id is 1234?"
 
-result = app.invoke({
-    "query": query
-})
+
+state = {
+        "query": "Why my order status and my order id is 1234?",
+        "history": [],
+       
+        "response": ""
+
+    }
+result = app.invoke(
+  state
+)
 
 
 print(result["query"])
-print(result["category"])
-# print(result["tone"])
+
 print(result["response"])

@@ -1,3 +1,5 @@
+from langchain.tools import tool
+@tool
 def account_login_tool(query: str) -> str:
     """
     Provides automated help responses for common account and login-related queries.

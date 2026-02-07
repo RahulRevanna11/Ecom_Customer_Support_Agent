@@ -1,51 +1,82 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import create_agent
-from langchain.messages import HumanMessage, SystemMessage,AIMessage
+from typing import Dict, Any
+import logging
 
-from langchain.messages import HumanMessage, SystemMessage,AIMessage
+from langchain.agents import create_agent
+from langchain.tools import tool
+
 from tools.order_and_shipping_tool import order_and_shipping_tool
 from state import GraphState
 from model import LLM
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
+ORDER_SHIPPING_SYSTEM_PROMPT = (
+    "You are an Order & Shipping support agent for an e-commerce platform.\n\n"
+    "Your responsibilities include:\n"
+    "- Providing order status updates\n"
+    "- Tracking shipments\n"
+    "- Explaining delivery timelines\n"
+    "- Clarifying shipping policies\n\n"
+    "Guidelines:\n"
+    "- If an order ID is required and missing, ask for it politely\n"
+    "- Use tools only when real order data is needed\n"
+    "- Never fabricate order details\n"
+    "- Use clear, assistive, and reassuring language\n"
+    "- Always ask if the user needs further help\n"
+)
 
-agent_executor = create_agent(
-model=LLM,
-tools=[order_and_shipping_tool],
-debug=True,
+order_shipping_agent = create_agent(
+    model=LLM,
+    tools=[order_and_shipping_tool],
+    system_prompt=ORDER_SHIPPING_SYSTEM_PROMPT,
+    debug=False,  
 )
 
 
-
-agent_executor = create_agent(
-model=LLM,
-tools=[order_and_shipping_tool],
-system_prompt=(
-      "You are an Order & Shipping support agent.\n"
-        "Your job is to help users with:\n"
-        "- Order status\n"
-        "- Shipment tracking\n"
-        "- Delivery timelines\n"
-        "- Shipping policies\n\n"
-        "If the request involves checking or tracking an order, "
-        "extract the order ID if provided.\n"
-        "Use tools when real order information is required.\n"
+# -----------------------------------------------------------------------------
+# Node Tool (Supervisor → Order & Shipping Agent)
+# -----------------------------------------------------------------------------
+@tool(
+    description=(
+        "Handles order and shipping queries such as order status, shipment "
+        "tracking, delivery timelines, and shipping policy questions by "
+        "delegating to the Order & Shipping support agent."
     ),
-debug=True,
 )
+def order_and_shipping_node(state: GraphState) -> str:
+    """
+    Entry point for order and shipping related queries.
 
+    Args:
+        state (GraphState): Shared graph state containing the user's query.
 
+    Returns:
+        str: Final response text safe for the end user.
+    """
+    query = state.get("query")
 
-def order_and_shipping_node(state: GraphState) -> GraphState:
-    result = agent_executor.invoke({
-        "messages": [("user", state["query"])]
-    })
+    if not query or not isinstance(query, str):
+        logger.warning("Missing or invalid query in GraphState")
+        return "I didn’t catch your order or shipping question. Could you please rephrase it?"
 
-  
-    return {
-      **state,
-        "response": result["messages"][-1].content
-    }
+    try:
+        response: Dict[str, Any] = order_shipping_agent.invoke(
+            {"messages": [("user", query)]}
+        )
 
+        messages = response.get("messages", [])
+        if not messages:
+            logger.error("Order & Shipping agent returned no messages")
+            return "Something went wrong while checking your order details."
 
+        last_message = messages[-1]
+        return last_message.content
+
+    except Exception:
+        logger.exception("Order & Shipping agent execution failed")
+        return (
+            "Sorry, I ran into an issue while processing your order or shipping request. "
+            "Please try again shortly."
+        )

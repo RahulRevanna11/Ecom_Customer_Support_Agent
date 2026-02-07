@@ -1,40 +1,31 @@
-from agents.account_and_login import account_and_login_node
-from agents.category import categorize_node
-from agents.order_and_shipping import order_and_shipping_node
+
+from langgraph.graph import StateGraph
 from state import GraphState
+from agents.supervisor import supervisor 
+from agents.human import human_node
+from agents.final import final_node
 
-from langgraph.graph import StateGraph, END
-from utils.router_node import router_node
-
-
-# Create the graph
 graph = StateGraph(GraphState)
 
-# Add nodes
-graph.add_node("category", categorize_node)
-graph.add_node("router", router_node)
-graph.add_node("account_and_login", account_and_login_node)
-graph.add_node("order_and_shipping", order_and_shipping_node)
 
-# Add edges
-# graph.add_edge("category", "router")
 
-graph.add_conditional_edges(
-    "category",
-    router_node,
-    {
-        "account_and_login": "account_and_login",
-        "order_and_shipping": "order_and_shipping",
-        # "billing": "billing",
-        # "general": "general",
-    },
-)
+graph.add_node("supervisor", supervisor)
+graph.add_node("human", human_node)
+# graph.add_node("final", final_node)
 
-graph.add_edge("account_and_login", END)
-graph.add_edge("order_and_shipping", END)
+# graph.add_conditional_edges(
+#     "supervisor",
+#     lambda s: s["next"],
+#     {
+#         "human": "human",
+#         "final": "final",
+#     }
+# )
 
-# Set entry point
-graph.set_entry_point("category")
+graph.add_edge("supervisor", "human")
+graph.add_edge("human", "supervisor")
 
-# Compile graph
+
+graph.set_entry_point("supervisor")
+
 app = graph.compile()

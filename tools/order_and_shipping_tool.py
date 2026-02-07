@@ -1,6 +1,5 @@
 from langchain.tools import tool
 from typing import Optional
-
 @tool
 def order_and_shipping_tool(
     intent: str,
