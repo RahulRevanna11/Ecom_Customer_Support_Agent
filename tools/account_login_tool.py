@@ -1,25 +1,22 @@
 from langchain.tools import tool
+
+
 @tool
 def account_login_tool(query: str) -> str:
     """
-    Provides automated help responses for common account and login-related queries.
-
-    The function analyzes a user’s query to determine whether they need help with
-    password recovery, account creation, or updating account details, and returns
-    step-by-step guidance accordingly.
+    Provide automated help for common account and login-related queries.
 
     Args:
-        query (str): A user’s natural-language question or request related to
-            account login, registration, password reset, or profile updates.
+        query: Natural-language question about login, registration, password
+            reset, or profile updates.
 
     Returns:
-        str: A helpful instructional message based on the detected intent in
-        the query. If no specific intent is detected, a general account-help
-        message is returned.
+        A helpful instructional message based on the detected intent.
     """
-    query = query.lower()
 
-    if "forgot" in query or "reset" in query:
+    normalized_query = query.lower()
+
+    if "forgot" in normalized_query or "reset" in normalized_query:
         return (
             "To reset your password:\n"
             "1. Go to the login page\n"
@@ -28,20 +25,21 @@ def account_login_tool(query: str) -> str:
             "4. Follow the link sent to your email"
         )
 
-    if "create" in query or "sign up" in query or "register" in query:
+    if (
+        "create" in normalized_query
+        or "sign up" in normalized_query
+        or "register" in normalized_query
+    ):
         return (
             "To create an account:\n"
             "1. Click 'Sign Up'\n"
             "2. Enter your email and password\n"
             "3. Verify your email\n"
-            "4. Login to start using the service"
+            "4. Log in to start using the service"
         )
 
-    if "change" in query or "update" in query:
-        return (
-            "You can update your account details from the Profile section "
-            "after logging in."
-        )
+    if "change" in normalized_query or "update" in normalized_query:
+        return "You can update your account details from the Profile section after logging in."
 
     return (
         "For account-related help, you can reset your password, "

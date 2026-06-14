@@ -1,16 +1,15 @@
-from typing import Dict, Any
 import logging
 
 from langchain.agents import create_agent
 from langchain.tools import tool
 
-from tools.product_info_tool import product_info_tool
-from state import GraphState
+from agents.common import get_query, run_agent
 from model import LLM
+from state import GraphState
+from tools.product_info_tool import product_info_tool
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 PRODUCT_INFO_SYSTEM_PROMPT = (
@@ -25,57 +24,40 @@ PRODUCT_INFO_SYSTEM_PROMPT = (
     "- Never fabricate pricing, discounts, availability, or specifications\n"
     "- If the product name or identifier is missing, ask for clarification\n"
     "- Keep responses clear, concise, and customer-friendly\n"
-    "- Always ask if the customer needs additional help\n"
+    "- Always ask if the customer needs additional help."
 )
 
 product_info_agent = create_agent(
     model=LLM,
     tools=[product_info_tool],
     system_prompt=PRODUCT_INFO_SYSTEM_PROMPT,
-    debug=False, 
+    debug=False,
 )
 
 
+def handle_product_info(state: GraphState) -> str:
+    """Handle product feature, price, availability, and description requests."""
 
-@tool(
-
-    description=(
-        "Provides product details such as features, pricing, availability, "
-        "and descriptions by delegating to the Product Information support agent."
-    ),
-)
-def product_info_node(state: GraphState) -> str:
-    """
-    Entry point for product information related queries.
-
-    Args:
-        state (GraphState): Shared graph state containing the user's query.
-
-    Returns:
-        str: Final user-safe response text.
-    """
-    query = state.get("query")
-
-    if not query or not isinstance(query, str):
-        logger.warning("Missing or invalid query in GraphState")
-        return "Could you please tell me which product you’d like information about?"
+    query = get_query(state)
+    if not query:
+        logger.warning("Invalid or missing user query in graph state")
+        return "Could you please tell me which product you'd like information about?"
 
     try:
-        response: Dict[str, Any] = product_info_agent.invoke(
-            {"messages": [("user", query)]}
-        )
-
-        messages = response.get("messages", [])
-        if not messages:
-            logger.error("Product Info agent returned no messages")
-            return "I wasn’t able to retrieve the product details right now."
-
-        last_message = messages[-1]
-        return last_message.content
-
+        return run_agent(product_info_agent, query, logger)
     except Exception:
-        logger.exception("Product Info agent execution failed")
+        logger.exception("Product information agent failed")
         return (
             "Sorry, something went wrong while fetching product information. "
             "Please try again in a moment."
         )
+
+
+@tool(
+    description=(
+        "Provides product details such as features, pricing, availability, "
+        "and descriptions."
+    ),
+)
+def product_info_node(state: GraphState) -> str:
+    return handle_product_info(state)

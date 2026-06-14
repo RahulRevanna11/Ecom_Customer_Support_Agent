@@ -1,22 +1,29 @@
-from typing_extensions import TypedDict, List
+from typing import List, Optional
 
-from pydantic import model_validator
+from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
 
-class GraphState(TypedDict):
-    query: str| None = None
-    # category: str
-   
-    response: str| None = None
-    history:List[str]| None = None
-    @model_validator(mode="before")
-    def validate_fields(cls, values):
-        if not values.get("query") and not values.get("response"):
-            raise ValueError("Either a or b must be provided")
-        return values  # omitting this line will lead to the error
-    
-from pydantic import BaseModel
+
+class GraphState(TypedDict, total=False):
+    """Shared state passed between LangGraph nodes."""
+
+    query: str
+    response: str
+    history: List[str]
+    route: str  # Store the routing decision from the LLM
+
 
 class SupervisorOutput(BaseModel):
-    response: str
+    """Structured output returned by the supervisor."""
+
+    response: str = Field(description="Final response to show the customer.")
 
 
+def build_initial_state(query: str, history: Optional[List[str]] = None) -> GraphState:
+    """Create a valid initial graph state for one customer turn."""
+
+    return {
+        "query": query,
+        "history": list(history or []),
+        "response": "",
+    }

@@ -1,16 +1,22 @@
+from agents.common import get_history
 from state import GraphState
 
+
 def human_node(state: GraphState) -> GraphState:
-    # Show assistant message
-    print(f"\nAI: {state['response']}")
+    """Optional terminal node for collecting another user message."""
 
-    # ⌨️ Read from terminal
-    human_input = input("USER: ")
+    response = state.get("response", "")
+    print(f"\nAI: {response}")
 
-    # Update state
-    state["history"].append(f"AI: {state['response']}")
-    state["history"].append(f"USER: {human_input}")
-    state["query"] = human_input
-    state["next"] = "supervisor"
+    human_input = input("USER: ").strip()
+    history = [
+        *get_history(state),
+        f"ASSISTANT: {response}",
+        f"USER: {human_input}",
+    ]
 
-    return state
+    return {
+        **state,
+        "query": human_input,
+        "history": history,
+    }

@@ -1,15 +1,15 @@
-from typing import Dict, Any
 import logging
 
 from langchain.agents import create_agent
 from langchain.tools import tool
 
-from tools.order_and_shipping_tool import order_and_shipping_tool
-from state import GraphState
+from agents.common import get_query, run_agent
 from model import LLM
+from state import GraphState
+from tools.order_and_shipping_tool import order_and_shipping_tool
+
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 ORDER_SHIPPING_SYSTEM_PROMPT = (
@@ -24,59 +24,40 @@ ORDER_SHIPPING_SYSTEM_PROMPT = (
     "- Use tools only when real order data is needed\n"
     "- Never fabricate order details\n"
     "- Use clear, assistive, and reassuring language\n"
-    "- Always ask if the user needs further help\n"
+    "- Always ask if the user needs further help."
 )
 
 order_shipping_agent = create_agent(
     model=LLM,
     tools=[order_and_shipping_tool],
     system_prompt=ORDER_SHIPPING_SYSTEM_PROMPT,
-    debug=False,  
+    debug=False,
 )
 
 
-# -----------------------------------------------------------------------------
-# Node Tool (Supervisor → Order & Shipping Agent)
-# -----------------------------------------------------------------------------
-@tool(
-    description=(
-        "Handles order and shipping queries such as order status, shipment "
-        "tracking, delivery timelines, and shipping policy questions by "
-        "delegating to the Order & Shipping support agent."
-    ),
-)
-def order_and_shipping_node(state: GraphState) -> str:
-    """
-    Entry point for order and shipping related queries.
+def handle_order_and_shipping(state: GraphState) -> str:
+    """Handle order status, tracking, delivery, and shipping policy requests."""
 
-    Args:
-        state (GraphState): Shared graph state containing the user's query.
-
-    Returns:
-        str: Final response text safe for the end user.
-    """
-    query = state.get("query")
-
-    if not query or not isinstance(query, str):
-        logger.warning("Missing or invalid query in GraphState")
-        return "I didn’t catch your order or shipping question. Could you please rephrase it?"
+    query = get_query(state)
+    if not query:
+        logger.warning("Invalid or missing user query in graph state")
+        return "I didn't catch your order or shipping question. Could you please rephrase it?"
 
     try:
-        response: Dict[str, Any] = order_shipping_agent.invoke(
-            {"messages": [("user", query)]}
-        )
-
-        messages = response.get("messages", [])
-        if not messages:
-            logger.error("Order & Shipping agent returned no messages")
-            return "Something went wrong while checking your order details."
-
-        last_message = messages[-1]
-        return last_message.content
-
+        return run_agent(order_shipping_agent, query, logger)
     except Exception:
-        logger.exception("Order & Shipping agent execution failed")
+        logger.exception("Order and shipping agent failed")
         return (
             "Sorry, I ran into an issue while processing your order or shipping request. "
             "Please try again shortly."
         )
+
+
+@tool(
+    description=(
+        "Handles order and shipping queries such as order status, shipment "
+        "tracking, delivery timelines, and shipping policy questions."
+    ),
+)
+def order_and_shipping_node(state: GraphState) -> str:
+    return handle_order_and_shipping(state)

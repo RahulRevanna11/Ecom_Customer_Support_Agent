@@ -1,26 +1,23 @@
-from langchain.tools import tool
 from typing import Optional
+
+from langchain.tools import tool
+
+
 @tool
-def order_and_shipping_tool(
-    intent: str,
-    order_id: Optional[str] = None
-) -> str:
+def order_and_shipping_tool(intent: str, order_id: Optional[str] = None) -> str:
     """
-    Retrieves information regarding customer orders and shipping logistics.
-    
-    Use this tool when the user asks about:
-    1. 'order_status': Current processing state of an order. Requires order_id.
-    2. 'track_order': Real-time shipping/tracking location. Requires order_id.
-    3. 'delivery_time': General shipping speed estimates (Standard vs Express).
-    4. 'shipping_policy': Information about shipping costs and free delivery thresholds.
+    Retrieve customer order and shipping information.
 
-    Args:
-        intent: The specific type of shipping or order query being made.
-        order_id: The unique order identifier (e.g., 'ORD123'). Required for status and tracking.
+    Supported intents:
+    - order_status: Current processing state of an order. Requires order_id.
+    - track_order: Real-time shipping or tracking location. Requires order_id.
+    - delivery_time: General shipping speed estimates.
+    - shipping_policy: Shipping costs and free delivery thresholds.
     """
 
-    # ---- Order status ----
-    if intent == "order_status":
+    normalized_intent = intent.lower().strip()
+
+    if normalized_intent == "order_status":
         if not order_id:
             return "Please provide your order ID to check the order status."
 
@@ -29,25 +26,19 @@ def order_and_shipping_tool(
             "is expected to ship within 24 hours."
         )
 
-    # ---- Tracking ----
-    if intent == "track_order":
+    if normalized_intent == "track_order":
         if not order_id:
             return "Please provide your order ID to track your shipment."
 
+        return f"Order {order_id} is in transit. Estimated delivery is 3-5 business days."
+
+    if normalized_intent == "delivery_time":
         return (
-            f"Order {order_id} is in transit. "
-            "Estimated delivery is 3–5 business days."
+            "Standard delivery takes 3-5 business days. "
+            "Express delivery takes 1-2 business days."
         )
 
-    # ---- Delivery timeline ----
-    if intent == "delivery_time":
-        return (
-            "Standard delivery takes 3–5 business days. "
-            "Express delivery takes 1–2 business days."
-        )
-
-    # ---- Shipping policy ----
-    if intent == "shipping_policy":
+    if normalized_intent == "shipping_policy":
         return (
             "We offer standard and express shipping. "
             "Shipping is free on orders above $50."

@@ -1,105 +1,160 @@
-import re
+import logging
+from enum import Enum
+from typing import Callable
+
+from agents.account_and_login import handle_account_and_login
+from agents.common import get_history, get_query
+from agents.general import handle_general
+from agents.order_and_shipping import handle_order_and_shipping
+from agents.product_info import handle_product_info
+from agents.refunds_and_returns import handle_refunds_and_returns
 from model import LLM
-from agents.account_and_login import account_and_login_node
-from agents.general import general_node
-from agents.order_and_shipping import order_and_shipping_node
-from agents.product_info import product_info_node
-from langchain.agents import create_agent
-from state import SupervisorOutput
-import json
+from state import GraphState
 
 
-
-from langchain.tools import tool
-
+logger = logging.getLogger(__name__)
 
 
-def supervisor(state):
-    SUPERVISOR_PROMPT = f"""
-You are a routing supervisor in a customer support system.
-
-Your role is CONTROL ONLY. You do not chat with the user.
-
-
-AVAILABLE TOOLS:
-- account_and_login_tool → login issues, password reset, account access
-- order_and_shipping_tool → order status, tracking, shipping
-- general_tool → greetings, unclear or unsupported requests
-
-After the tool executes, you must decide whether more
-information is required from the user.
-
-You MUST return a VALID JSON object with EXACTLY this schema:
-
-{{
-  "response": "<tool response to show the user>",
-}}
-
-STRICT RULES:
-- ALWAYS call exactly one tool.
-- ALWAYS return valid JSON.
-- Use true/false as BOOLEAN values (not strings).
-- Do NOT include any text outside the JSON.
-
-CONVERSATION HISTORY (for context only):
-{state["history"]}
-"""
+class SupportRoute(str, Enum):
+    ACCOUNT = "account_and_login"
+    GENERAL = "general"
+    ORDER = "order_and_shipping"
+    PRODUCT = "product_info"
+    REFUNDS = "refunds_and_returns"
 
 
-    agent = create_agent(
-        model=LLM,
-        tools=[
-            account_and_login_node,
-            order_and_shipping_node,
-            general_node,
-            product_info_node,
-            
-        ],
-        system_prompt=SUPERVISOR_PROMPT,
-        debug=False,
-            response_format=SupervisorOutput,  # 🔥 THIS IS THE FIX
+ROUTE_HANDLERS: dict[SupportRoute, Callable[[GraphState], str]] = {
+    SupportRoute.ACCOUNT: handle_account_and_login,
+    SupportRoute.GENERAL: handle_general,
+    SupportRoute.ORDER: handle_order_and_shipping,
+    SupportRoute.PRODUCT: handle_product_info,
+    SupportRoute.REFUNDS: handle_refunds_and_returns,
+}
 
-    )
-    print(f"Query : {state['query']}")
-    st='***********************************************************************************************************************************************'
-    result = agent.invoke({"messages": [("user", state["query"])]})
-    # print('')
- 
-    last_message = result['messages'][-1].content
 
-    # print(st)
-    # print(last_message)
+ROUTE_KEYWORDS: dict[SupportRoute, tuple[str, ...]] = {
+    SupportRoute.ACCOUNT: (
+        "account",
+        "login",
+        "log in",
+        "sign in",
+        "sign up",
+        "password",
+        "profile",
+    ),
+    SupportRoute.ORDER: (
+        "order",
+        "shipping",
+        "shipment",
+        "track",
+        "tracking",
+        "delivery",
+        "delivered",
+    ),
+    SupportRoute.PRODUCT: (
+        "product",
+        "price",
+        "pricing",
+        "availability",
+        "available",
+        "stock",
+        "feature",
+        "spec",
+    ),
+    SupportRoute.REFUNDS: (
+        "refund",
+        "return",
+        "replacement",
+        "exchange",
+        "cancel",
+        "cancellation",
+    ),
+}
+
+
+def _build_routing_prompt(query: str, history: list[str]) -> str:
+    """Build a prompt for the LLM to classify the query into a support route."""
     
-
-    # print(st)
-    # print(result)
-
-    # structured = result["response"]
+    history_text = "\n".join(history[-6:]) if history else "No conversation history"
     
-    cleaned = re.sub(r"```json|```", "", last_message).strip()
-  
-    # Parse JSON
-    response = json.loads(cleaned)
+    return f"""You are a customer support router. Classify the following customer query into ONE of these categories:
+
+CATEGORIES:
+1. account_and_login - Account access, login issues, password reset, sign up, profile management
+2. order_and_shipping - Orders, tracking, shipments, delivery status, order status
+3. product_info - Product details, pricing, features, specifications, availability, stock
+4. refunds_and_returns - Refunds, returns, exchanges, replacements, cancellations
+5. general - Greetings, general questions, unclear requests, anything else
+
+CONVERSATION HISTORY:
+{history_text}
+
+CUSTOMER QUERY: {query}
+
+Respond with ONLY the category name (e.g., "account_and_login") and a brief reason on the next line. Do not include any other text."""
 
 
+def route_query(state: GraphState) -> str:
+    """Use the LLM to intelligently classify and route the query to the right agent."""
+    
+    query = get_query(state)
+    history = get_history(state)
+    
+    if not query:
+        logger.warning("Invalid or missing user query in graph state")
+        return "general"
+    
+    prompt = _build_routing_prompt(query, history)
+    
+    try:
+        # Invoke the LLM to classify the query
+        response = LLM.invoke(prompt)
+        response_text = response.content.strip().lower()
+        
+        # Extract the first line (the category name)
+        category = response_text.split('\n')[0].strip()
+        
+        logger.debug(f"LLM routing response: {response_text}")
+        
+        # Map the response to a SupportRoute
+        for route in SupportRoute:
+            if route.value in category:
+                logger.info(f"LLM routed query to: {route.value}")
+                return route.value
+        
+        # Fallback to GENERAL if LLM response doesn't match any route
+        logger.warning(f"LLM response '{category}' didn't match any route, defaulting to GENERAL")
+        return SupportRoute.GENERAL.value
+        
+    except Exception as e:
+        logger.error(f"LLM routing failed: {e}, falling back to GENERAL")
+        return SupportRoute.GENERAL.value
 
-    print("*************************************************************************************************************")
-    # print(tool_response)
-    # supervisor_output = json.loads(last_message)
 
-    # supervisor_output = json.loads(last_message)
-    # print(last_message)
-    # print(st)
-    # print(supervisor_output)
-    # response = supervisor_output["response"]
-    print(f"response:{response}")
+def supervisor(state: GraphState) -> GraphState:
+    """Supervisor node - routes query and updates history with response."""
 
+    query = get_query(state)
+    history = get_history(state)
+    
+    # Get the route from the router
+    route = route_query(state)
+    
+    logger.info("LLM routed customer query to %s", route)
+    
+    # Get the appropriate handler and execute it
+    handler = ROUTE_HANDLERS.get(SupportRoute(route), handle_general)
+    response = handler(state)
 
-    state["history"].append(f"USER: {state['query']}")
-    state["history"].append(f"AI: {response}")
+    updated_history = [
+        *history,
+        f"USER: {query}",
+        f"ASSISTANT: {response}",
+    ]
 
     return {
         **state,
+        "query": query,
         "response": response,
-       
+        "history": updated_history,
     }

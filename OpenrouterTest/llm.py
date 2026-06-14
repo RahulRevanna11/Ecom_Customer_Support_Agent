@@ -1,22 +1,19 @@
-from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
+from langchain_openai import ChatOpenAI
 
 api_key=os.getenv("OPENROUTER_API_KEY")
 if not api_key:
     raise ValueError("Error: OPENROUTER_API_KEY is missing.")
-llm_model = ChatOpenAI(
+
+
+llm = ChatOpenAI(
     model="google/gemma-4-31b-it:free",
     api_key=api_key,
     base_url="https://openrouter.ai/api/v1",
 )
-# from langchain_xai import ChatXAI
+response = llm.invoke("Explain quantum computing")
 
-# llm_model = ChatXAI(
-#     model="grok-3-mini",
-#     temperature=0,
-#     max_tokens=None,
-#     timeout=None,
-#     max_retries=2,
-#     # other params...
-# )
+# Use dot notation as required by the native OpenAI python SDK
+print(response.content)
