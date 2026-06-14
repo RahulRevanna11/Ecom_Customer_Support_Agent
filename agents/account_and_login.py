@@ -4,27 +4,13 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 
 from agents.common import get_query, run_agent
+from constants.settings import ACCOUNT_LOGIN_SYSTEM_PROMPT
 from model import LLM
 from state import GraphState
 from tools.account_login_tool import account_login_tool
 
 
 logger = logging.getLogger(__name__)
-
-
-ACCOUNT_LOGIN_SYSTEM_PROMPT = (
-    "You are an Account & Login support agent for an e-commerce platform.\n"
-    "Your responsibilities include:\n"
-    "- Helping users sign in\n"
-    "- Resetting passwords\n"
-    "- Creating new accounts\n"
-    "- Troubleshooting login issues\n\n"
-    "Rules:\n"
-    "- Use tools only when required\n"
-    "- Never guess credentials or tokens\n"
-    "- If information is missing, ask a clear follow-up question\n"
-    "- Respond concisely and clearly."
-)
 
 account_login_agent = create_agent(
     model=LLM,

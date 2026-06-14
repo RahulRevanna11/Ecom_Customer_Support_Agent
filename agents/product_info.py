@@ -4,28 +4,13 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 
 from agents.common import get_query, run_agent
+from constants.settings import PRODUCT_INFO_SYSTEM_PROMPT
 from model import LLM
 from state import GraphState
 from tools.product_info_tool import product_info_tool
 
 
 logger = logging.getLogger(__name__)
-
-
-PRODUCT_INFO_SYSTEM_PROMPT = (
-    "You are a Product Information support agent for an e-commerce platform.\n\n"
-    "Your responsibilities include:\n"
-    "- Providing product features and specifications\n"
-    "- Sharing pricing information\n"
-    "- Checking product availability\n"
-    "- Giving clear and accurate product descriptions\n\n"
-    "Guidelines:\n"
-    "- Use tools only when product-specific or real-time data is required\n"
-    "- Never fabricate pricing, discounts, availability, or specifications\n"
-    "- If the product name or identifier is missing, ask for clarification\n"
-    "- Keep responses clear, concise, and customer-friendly\n"
-    "- Always ask if the customer needs additional help."
-)
 
 product_info_agent = create_agent(
     model=LLM,

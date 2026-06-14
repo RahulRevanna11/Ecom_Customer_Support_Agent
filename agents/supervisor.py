@@ -8,6 +8,7 @@ from agents.general import handle_general
 from agents.order_and_shipping import handle_order_and_shipping
 from agents.product_info import handle_product_info
 from agents.refunds_and_returns import handle_refunds_and_returns
+from constants.settings import ROUTER_PROMPT_TEMPLATE
 from model import LLM
 from state import GraphState
 
@@ -32,66 +33,12 @@ ROUTE_HANDLERS: dict[SupportRoute, Callable[[GraphState], str]] = {
 }
 
 
-ROUTE_KEYWORDS: dict[SupportRoute, tuple[str, ...]] = {
-    SupportRoute.ACCOUNT: (
-        "account",
-        "login",
-        "log in",
-        "sign in",
-        "sign up",
-        "password",
-        "profile",
-    ),
-    SupportRoute.ORDER: (
-        "order",
-        "shipping",
-        "shipment",
-        "track",
-        "tracking",
-        "delivery",
-        "delivered",
-    ),
-    SupportRoute.PRODUCT: (
-        "product",
-        "price",
-        "pricing",
-        "availability",
-        "available",
-        "stock",
-        "feature",
-        "spec",
-    ),
-    SupportRoute.REFUNDS: (
-        "refund",
-        "return",
-        "replacement",
-        "exchange",
-        "cancel",
-        "cancellation",
-    ),
-}
-
-
 def _build_routing_prompt(query: str, history: list[str]) -> str:
     """Build a prompt for the LLM to classify the query into a support route."""
     
     history_text = "\n".join(history[-6:]) if history else "No conversation history"
     
-    return f"""You are a customer support router. Classify the following customer query into ONE of these categories:
-
-CATEGORIES:
-1. account_and_login - Account access, login issues, password reset, sign up, profile management
-2. order_and_shipping - Orders, tracking, shipments, delivery status, order status
-3. product_info - Product details, pricing, features, specifications, availability, stock
-4. refunds_and_returns - Refunds, returns, exchanges, replacements, cancellations
-5. general - Greetings, general questions, unclear requests, anything else
-
-CONVERSATION HISTORY:
-{history_text}
-
-CUSTOMER QUERY: {query}
-
-Respond with ONLY the category name (e.g., "account_and_login") and a brief reason on the next line. Do not include any other text."""
+    return ROUTER_PROMPT_TEMPLATE.format(history_text=history_text, query=query)
 
 
 def route_query(state: GraphState) -> str:

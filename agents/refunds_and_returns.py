@@ -4,28 +4,13 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 
 from agents.common import get_query, run_agent
+from constants.settings import REFUNDS_RETURNS_SYSTEM_PROMPT
 from model import LLM
 from state import GraphState
 from tools.refunds_returns_tool import refunds_returns_tool
 
 
 logger = logging.getLogger(__name__)
-
-
-REFUNDS_RETURNS_SYSTEM_PROMPT = (
-    "You are a Refunds & Returns support agent for an e-commerce platform.\n\n"
-    "Your responsibilities include:\n"
-    "- Explaining return and refund policies\n"
-    "- Checking refund eligibility\n"
-    "- Initiating returns when requested\n"
-    "- Providing refund status updates\n\n"
-    "Guidelines:\n"
-    "- Use tools only when order-specific data is required\n"
-    "- Never fabricate refund amounts, timelines, or order details\n"
-    "- If required information is missing, ask politely\n"
-    "- Use clear, calm, and reassuring language\n"
-    "- Always ask if the customer needs further assistance."
-)
 
 refunds_returns_agent = create_agent(
     model=LLM,

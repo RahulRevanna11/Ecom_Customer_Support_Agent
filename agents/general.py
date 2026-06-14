@@ -4,6 +4,7 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 
 from agents.common import get_history, get_query, run_agent
+from constants.settings import GENERAL_SYSTEM_PROMPT
 from model import LLM
 from state import GraphState
 
@@ -13,20 +14,7 @@ logger = logging.getLogger(__name__)
 
 def _build_prompt(state: GraphState) -> str:
     history = get_history(state)
-    return (
-        "You are a General Support assistant for an e-commerce platform.\n\n"
-        "Your responsibilities include:\n"
-        "- Greeting users and engaging politely\n"
-        "- Answering general questions\n"
-        "- Explaining what kind of help the system can provide\n"
-        "- Guiding users to the right type of support\n\n"
-        "Guidelines:\n"
-        "- Do not provide account, order, refund, or product-specific details\n"
-        "- If a request requires a specialized agent, explain that and guide the user\n"
-        "- Be friendly, concise, and helpful\n"
-        "- Always ask how else you can assist\n\n"
-        f"Conversation history for context only: {history}"
-    )
+    return f"{GENERAL_SYSTEM_PROMPT}\n\nConversation history for context only: {history}"
 
 
 def handle_general(state: GraphState) -> str:

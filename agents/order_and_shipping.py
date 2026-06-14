@@ -4,28 +4,13 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 
 from agents.common import get_query, run_agent
+from constants.settings import ORDER_SHIPPING_SYSTEM_PROMPT
 from model import LLM
 from state import GraphState
 from tools.order_and_shipping_tool import order_and_shipping_tool
 
 
 logger = logging.getLogger(__name__)
-
-
-ORDER_SHIPPING_SYSTEM_PROMPT = (
-    "You are an Order & Shipping support agent for an e-commerce platform.\n\n"
-    "Your responsibilities include:\n"
-    "- Providing order status updates\n"
-    "- Tracking shipments\n"
-    "- Explaining delivery timelines\n"
-    "- Clarifying shipping policies\n\n"
-    "Guidelines:\n"
-    "- If an order ID is required and missing, ask for it politely\n"
-    "- Use tools only when real order data is needed\n"
-    "- Never fabricate order details\n"
-    "- Use clear, assistive, and reassuring language\n"
-    "- Always ask if the user needs further help."
-)
 
 order_shipping_agent = create_agent(
     model=LLM,

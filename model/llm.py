@@ -1,14 +1,11 @@
 from langchain_openai import ChatOpenAI
-import os
-from dotenv import load_dotenv
 
-api_key=os.getenv("OPENROUTER_API_KEY")
-if not api_key:
-    raise ValueError("Error: OPENROUTER_API_KEY is missing.")
+from constants.settings import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL_NAME
+
 llm_model = ChatOpenAI(
-    model="google/gemma-4-31b-it:free",
-    api_key=api_key,
-    base_url="https://openrouter.ai/api/v1",
+    model=LLM_MODEL_NAME,
+    api_key=OPENROUTER_API_KEY,
+    base_url=OPENROUTER_BASE_URL,
 )
 # from langchain_xai import ChatXAI
 
